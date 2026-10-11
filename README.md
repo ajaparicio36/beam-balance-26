@@ -2,8 +2,6 @@
 
 A Python-based program that analyzes a structural beam under different loading conditions, such as point loads, uniformly distributed loads, triangular loads, and applied moments. The program allows users to select different types of supports and automatically calculates the support reactions, shear force, bending moment, slope, and deflection. It also provides a digital visualization of the beam and its deformed shape to help users understand how loads affect a structural beam.
 
-Client: **Emman James P. Faderon**. The name appears in the lower-right footer; **About** shows the program description.
-
 Inspired by the public [Optimal Beam calculator](https://optimalbeam.com/beam-calculator.php). This educational reconstruction uses its own interface and solver. It includes advanced beam and load arrangements without accounts or paid services.
 
 ## Run
