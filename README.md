@@ -1,6 +1,8 @@
-# Beam Balance
+# Digital Multi-Load Beam Structural Analysis and Simulation System
 
-A one-file Python desktop beam calculator for a computer programming final project. Model a beam, calculate reactions, view shear/moment/deflection diagrams, and use **Show Solution** to inspect the formulas and substitutions.
+A Python-based program that analyzes a structural beam under different loading conditions, such as point loads, uniformly distributed loads, triangular loads, and applied moments. The program allows users to select different types of supports and automatically calculates the support reactions, shear force, bending moment, slope, and deflection. It also provides a digital visualization of the beam and its deformed shape to help users understand how loads affect a structural beam.
+
+Client: **Emman James P. Faderon**. The name appears in the lower-right footer; **About** shows the program description.
 
 Inspired by the public [Optimal Beam calculator](https://optimalbeam.com/beam-calculator.php). This educational reconstruction uses its own interface and solver. It includes advanced beam and load arrangements without accounts or paid services.
 
@@ -22,13 +24,13 @@ The application is entirely in `beam_balance.py`. The other files are documentat
 
 ## Use
 
-1. Set length in **m** and constant flexural rigidity **EI in kN·m²**.
+1. Set length in **m**. Choose **Constant EI** to enter flexural rigidity in **kN·m²**, or **E and I** to enter E in **GPa** and I in **mm⁴**. Only the active property inputs are used; both modes represent constant stiffness along the beam.
 2. In **Supports**, add Pinned, Roller, or Fixed supports at their x positions. Fixed supports must be at an end. Two distinct pins/rollers or one fixed end restrain the beam.
 3. In **Loads**, add Point forces, Moment couples, UDLs, or Linear distributed loads. Linear loads cover triangles and trapezoids through their start/end intensities.
 4. Select a table row to edit it, then **Save**, or use **Remove**. **Add** creates a new row.
-5. **Calculate** updates reactions and diagrams. **Read** evaluates x; at jumps the values are shown as left / right. **Show Solution** opens the derivation and current model's results.
+5. **Calculate** updates reactions, shaded diagrams and the deformed beam overlay. The dashed green deformed shape is **magnified** for visibility. **Read** evaluates x, including slope θ in radians; at jumps the shear/moment values are shown as left / right. **Show Solution** opens the derivation and current model's results.
 
-**Example** loads the 6 m simply supported beam with a 30 kN center force. **Clear** removes supports and loads, keeping length/EI. Changes to the model clear old results; editing draft row fields takes effect when Add/Save is clicked.
+**Example** loads the 6 m simply supported beam with a 30 kN center force and Constant EI=30,000. The matching E/I defaults are E=200 GPa and I=150,000,000 mm⁴. **Clear** removes supports and loads, keeping beam properties. Changes to the model or stiffness inputs clear old results and the deformed overlay; editing draft support/load fields takes effect when Add/Save is clicked.
 
 Signs: forces and intensities are positive **downward**; couples are positive **counterclockwise**; reactions are positive **upward**. Internal moment is positive **sagging**. Deflection is positive upward, so a downward deflection is negative. Reactions use kN and kN·m; deflection diagrams/readouts use mm. The solution also shows y in m and rotation in radians.
 
@@ -52,7 +54,7 @@ The pure-Python solver places nodes at every support/load boundary, assembles Eu
 
 - [Plan](docs/info/PLAN.md)
 - [Program flowchart](docs/info/FLOWCHART.md)
-- [Algorithm and derivation](docs/info/ALGORITHM.md)
+- [Step-by-step program algorithm](docs/info/ALGORITHM.md)
 
 ## Verify
 

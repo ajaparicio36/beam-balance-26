@@ -1,4 +1,6 @@
-# Beam Balance reconstruction plan
+# Digital Multi-Load Beam Structural Analysis and Simulation System
+
+## Reconstruction plan
 
 ## Goal
 
@@ -14,11 +16,12 @@ Build a beginner-friendly desktop beam calculator inspired by the public [Optima
 
 ## Interface
 
-- Beam length (m) and flexural rigidity EI (kN·m²).
+- Beam length (m) and a stiffness choice: Constant EI (kN·m²) or separate E (GPa) and I (mm⁴). Both use constant EI along the beam.
 - Support type and position, with Add/Edit/Remove actions.
 - Load type; position or interval; signed force, couple, or start/end intensity.
 - Short main actions: Example, Calculate, Clear, Show Solution.
-- Results: reactions, maximum/minimum moment and shear, diagrams, and values at a requested x. Deflection is included because the stiffness solution already determines it.
+- Results: reactions, maximum/minimum moment and shear, shaded diagrams, and values at a requested x including slope. Deflection and a magnified deformed shape use the stiffness solution.
+- Show the full program title, client name in the lower-right footer, and program description in About.
 - Model changes invalidate displayed calculations so stale results cannot be mistaken for current results.
 
 ## Verification and delivery

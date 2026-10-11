@@ -3,7 +3,7 @@
 import math
 import unittest
 
-from beam_balance import Load, Support, polynomial_roots, solve_beam
+from beam_balance import Load, Support, polynomial_roots, solve_beam, stiffness_value
 
 
 class BeamBenchmarks(unittest.TestCase):
@@ -232,6 +232,40 @@ class BeamBenchmarks(unittest.TestCase):
         self.assertEqual(len(roots), 3)
         for actual, expected in zip(roots, (.2, .5, .8)):
             self.assert_close(actual, expected)
+
+
+class StiffnessInputs(unittest.TestCase):
+    def test_direct_ignores_inactive_properties(self):
+        self.assertEqual(stiffness_value("Constant EI", "30000", "bad", float("nan")), 30000)
+
+    def test_derived_ignores_inactive_direct_input(self):
+        self.assertAlmostEqual(stiffness_value("E and I", "bad", "200", "150000000"), 30000)
+        self.assertAlmostEqual(stiffness_value("E and I", float("inf"), 200, 8000000), 1600)
+
+    def test_active_property_validation(self):
+        for value in ("bad", 0, -1, float("nan"), float("inf")):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    stiffness_value("Constant EI", value, 200, 1)
+                with self.assertRaises(ValueError):
+                    stiffness_value("E and I", 30000, value, 1)
+                with self.assertRaises(ValueError):
+                    stiffness_value("E and I", 30000, 200, value)
+
+    def test_product_overflow_underflow_and_intermediate_scaling(self):
+        for e, i in ((1e200, 1e200), (1e-200, 1e-200)):
+            with self.subTest(e=e, i=i), self.assertRaises(ValueError):
+                stiffness_value("E and I", 1, e, i)
+        self.assertAlmostEqual(stiffness_value("E and I", 1, 1e160, 1e150)/1e304, 1)
+
+    def test_direct_and_derived_models_agree(self):
+        supports = [Support("Pinned", 0), Support("Roller", 6)]
+        loads = [Load("Point", 3, 30)]
+        direct = solve_beam(6, stiffness_value("Constant EI", 30000, 0, 0), supports, loads)
+        derived = solve_beam(6, stiffness_value("E and I", 0, 200, 150000000), supports, loads)
+        for x in (0, 1, 3, 5, 6):
+            for actual, expected in zip(direct.deflection(x), derived.deflection(x)):
+                self.assertAlmostEqual(actual, expected)
 
 
 class InvalidModels(unittest.TestCase):

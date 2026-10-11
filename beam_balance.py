@@ -1,4 +1,4 @@
-"""Beam Balance: one-file educational Euler–Bernoulli beam calculator.
+"""Digital Multi-Load Beam Structural Analysis and Simulation System.
 
 Run with Python 3.11+; Tkinter is the only GUI dependency. Importing this
 module does not open a window, so the calculation functions can be tested.
@@ -11,6 +11,18 @@ from dataclasses import dataclass
 import math
 import tkinter as tk
 from tkinter import messagebox, ttk
+
+
+APP_TITLE = "Digital Multi-Load Beam Structural Analysis and Simulation System"
+CLIENT_NAME = "Emman James P. Faderon"
+APP_DESCRIPTION = (
+    "A Python-based program that analyzes a structural beam under different loading conditions, "
+    "such as point loads, uniformly distributed loads, triangular loads, and applied moments. "
+    "The program allows users to select different types of supports and automatically calculates "
+    "the support reactions, shear force, bending moment, slope, and deflection. It also provides "
+    "a digital visualization of the beam and its deformed shape to help users understand how "
+    "loads affect a structural beam."
+)
 
 
 @dataclass(frozen=True)
@@ -44,6 +56,30 @@ def finite_number(value: object, label: str) -> float:
     if not math.isfinite(result):
         raise ValueError(f"{label} must be finite.")
     return result
+
+
+def stiffness_value(mode: str, direct: object, modulus: object, inertia: object) -> float:
+    """Read only the active constant stiffness inputs; E uses GPa and I uses mm⁴."""
+    if mode == "Constant EI":
+        ei = finite_number(direct, "EI")
+    elif mode == "E and I":
+        e = finite_number(modulus, "E")
+        i = finite_number(inertia, "I")
+        if e <= 0 or i <= 0:
+            raise ValueError("E and I must each be greater than zero.")
+        # Separate exponents avoid unnecessary intermediate product overflow.
+        em, ee = math.frexp(e)
+        im, ie = math.frexp(i)
+        fm, fe = math.frexp(1e-6)
+        try:
+            ei = math.ldexp(em * im * fm, ee + ie + fe)
+        except OverflowError as exc:
+            raise ValueError("E × I exceeds floating-point range.") from exc
+    else:
+        raise ValueError("Choose Constant EI or E and I.")
+    if not math.isfinite(ei) or ei <= 0:
+        raise ValueError("EI must be finite and greater than zero; check the active stiffness inputs.")
+    return ei
 
 
 def validate_model(length: float, ei: float, supports: list[Support],
@@ -281,7 +317,7 @@ class BeamResult:
         return min(candidates), max(candidates)
 
     def solution_text(self) -> str:
-        lines = ["BEAM BALANCE · WORKED SOLUTION", "",
+        lines = [APP_TITLE + " · WORKED SOLUTION", "",
                  f"L = {self.length:g} m     EI = {self.ei:g} kN·m²",
                  "Downward loads positive; upward reactions positive; couples positive CCW.",
                  "Positive M = sagging; y positive upward (negative = downward).", "",
@@ -420,7 +456,7 @@ class BeamApp:
         self.loads: list[Load] = []
         self.result: BeamResult | None = None
         self.solution_window: tk.Toplevel | None = None
-        root.title("Beam Balance")
+        root.title(APP_TITLE)
         root.geometry("1240x880")
         root.minsize(1020, 760)
         style = ttk.Style(root)
@@ -434,6 +470,9 @@ class BeamApp:
         root.configure(background="#f5f6f8")
         self.length = tk.StringVar(value="6")
         self.ei = tk.StringVar(value="30000")
+        self.stiffness_mode = tk.StringVar(value="Constant EI")
+        self.modulus = tk.StringVar(value="200")
+        self.inertia = tk.StringVar(value="150000000")
         self.support_kind = tk.StringVar(value="Pinned")
         self.support_x = tk.StringVar(value="0")
         self.load_kind = tk.StringVar(value="Point")
@@ -448,8 +487,12 @@ class BeamApp:
         self._build_ui()
         self.length.trace_add("write", self._input_changed)
         self.ei.trace_add("write", self._input_changed)
+        self.modulus.trace_add("write", self._input_changed)
+        self.inertia.trace_add("write", self._input_changed)
+        self.stiffness_mode.trace_add("write", self._stiffness_fields)
         self.load_kind.trace_add("write", self._load_fields)
         self._load_fields()
+        self._stiffness_fields()
         self.example()
 
     def _build_ui(self) -> None:
@@ -457,8 +500,16 @@ class BeamApp:
         main.pack(fill="both", expand=True)
         header = ttk.Frame(main)
         header.pack(fill="x", pady=(0, 12))
-        ttk.Label(header, text="Beam Balance", font=("Segoe UI", 22, "bold")).pack(side="left")
-        ttk.Label(header, text="Reactions · shear · moment · deflection", font=("Segoe UI", 11)).pack(side="left", padx=20)
+        ttk.Button(header, text="About", command=self.show_about).pack(side="right", padx=(12, 0))
+        title_label = ttk.Label(header, text=APP_TITLE, font=("Segoe UI", 17, "bold"), wraplength=1080)
+        title_label.pack(side="left", fill="x", expand=True)
+        header.bind("<Configure>", lambda event: title_label.configure(wraplength=max(event.width-95, 300)))
+        footer = ttk.Frame(main)
+        footer.pack(side="bottom", fill="x", pady=(10, 0))
+        ttk.Label(footer, text=CLIENT_NAME, font=("Segoe UI", 10, "bold")).pack(side="right", padx=(14, 0), anchor="se")
+        status_label = ttk.Label(footer, textvariable=self.status, wraplength=880)
+        status_label.pack(side="left", fill="x", expand=True)
+        footer.bind("<Configure>", lambda event: status_label.configure(wraplength=max(event.width-220, 200)))
         body = ttk.Frame(main)
         body.pack(fill="both", expand=True)
         setup = ttk.Frame(body, width=360)
@@ -469,7 +520,13 @@ class BeamApp:
         beam = ttk.LabelFrame(setup, text="Beam", padding=10)
         beam.pack(fill="x", pady=(0, 10))
         self._field(beam, "Length (m)", self.length, 0)
-        self._field(beam, "EI (kN·m²)", self.ei, 1)
+        ttk.Label(beam, text="Stiffness").grid(row=1, column=0, sticky="w", pady=3)
+        ttk.Combobox(beam, textvariable=self.stiffness_mode, values=("Constant EI", "E and I"), state="readonly", width=16).grid(row=1, column=1, sticky="ew", padx=(8, 0))
+        self.ei_entry = self._field(beam, "EI (kN·m²)", self.ei, 2)
+        self.modulus_entry = self._field(beam, "E (GPa)", self.modulus, 3)
+        self.inertia_entry = self._field(beam, "I (mm⁴)", self.inertia, 4)
+        self.stiffness_rows = {"Constant EI": beam.grid_slaves(row=2),
+                               "E and I": beam.grid_slaves(row=3) + beam.grid_slaves(row=4)}
         actions = ttk.Frame(setup)
         actions.pack(fill="x", pady=(0, 6))
         for text, command in (("Example", self.example), ("Calculate", self.calculate), ("Clear", self.clear)):
@@ -531,9 +588,6 @@ class BeamApp:
             canvas.grid(row=row, column=0, sticky="nsew", pady=(0, 7))
             canvas.bind("<Configure>", lambda _event, q=quantity: self.draw_chart(q))
             self.chart_canvases[quantity] = canvas
-        status_label = ttk.Label(main, textvariable=self.status, wraplength=1180)
-        status_label.pack(fill="x", pady=(10, 0))
-        main.bind("<Configure>", lambda event: status_label.configure(wraplength=max(event.width-32, 200)))
 
     @staticmethod
     def _field(parent: ttk.Frame, label: str, variable: tk.StringVar, row: int) -> ttk.Entry:
@@ -572,6 +626,16 @@ class BeamApp:
         self.end_entry.configure(state="normal" if kind == "Linear" else "disabled")
         self.value_label.configure(text={"Point": "P (kN)", "Moment": "C (kN·m)", "UDL": "q (kN/m)", "Linear": "Start q (kN/m)"}[kind])
 
+    def _stiffness_fields(self, *_args) -> None:
+        mode = self.stiffness_mode.get()
+        for name, widgets in self.stiffness_rows.items():
+            for widget in widgets:
+                if name == mode:
+                    widget.grid()
+                else:
+                    widget.grid_remove()
+        self._input_changed()
+
     def _input_changed(self, *_args) -> None:
         self.invalidate()
         self.draw_beam()
@@ -589,6 +653,7 @@ class BeamApp:
         self.solution_window = None
         for quantity in self.chart_canvases:
             self.draw_chart(quantity)
+        self.draw_beam()
 
     def refresh_model(self) -> None:
         self.support_table.delete(*self.support_table.get_children())
@@ -603,7 +668,8 @@ class BeamApp:
         self.draw_beam()
 
     def beam_parameters(self) -> tuple[float, float]:
-        return finite_number(self.length.get(), "Length"), finite_number(self.ei.get(), "EI")
+        return (finite_number(self.length.get(), "Length"),
+                stiffness_value(self.stiffness_mode.get(), self.ei.get(), self.modulus.get(), self.inertia.get()))
 
     def support_input(self) -> Support:
         return Support(self.support_kind.get(), finite_number(self.support_x.get(), "Support x"))
@@ -708,7 +774,10 @@ class BeamApp:
 
     def example(self) -> None:
         self.length.set("6")
+        self.stiffness_mode.set("Constant EI")
         self.ei.set("30000")
+        self.modulus.set("200")
+        self.inertia.set("150000000")
         self.supports = [Support("Pinned", 0), Support("Roller", 6)]
         self.loads = [Load("Point", 3, 30)]
         self.read_x.set("3")
@@ -737,6 +806,7 @@ class BeamApp:
             self.read_button.configure(state="normal")
             for quantity in self.chart_canvases:
                 self.draw_chart(quantity)
+            self.draw_beam()
             self.read_values()
             self.status.set("Calculated. Ideal constant-EI elastic beam; +M sagging, +y upward. Show Solution explains the formulas.")
         except ValueError as exc:
@@ -750,10 +820,10 @@ class BeamApp:
             x = finite_number(self.read_x.get(), "x")
             left = self.result.shear_moment(x, "left")
             right = self.result.shear_moment(x)
-            y, _theta = self.result.deflection(x)
+            y, theta = self.result.deflection(x)
             def pair(a: float, b: float) -> str:
                 return f"{a:.6g} / {b:.6g}" if not math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-9) else f"{b:.6g}"
-            self.readout.set(f"V {pair(left[0], right[0])} kN   M {pair(left[1], right[1])} kN·m   y {y*1000:.6g} mm")
+            self.readout.set(f"V {pair(left[0], right[0])} kN   M {pair(left[1], right[1])} kN·m   y {y*1000:.6g} mm   θ {theta:.6g} rad")
             self.status.set("Read shows left / right values at jumps. Deflection is positive upward.")
         except ValueError as exc:
             self.error(exc)
@@ -766,15 +836,23 @@ class BeamApp:
             return
         window = tk.Toplevel(self.root)
         self.solution_window = window
-        window.title("Beam Balance · Solution")
+        window.title(APP_TITLE + " · Solution")
         window.geometry("850x700")
         text = tk.Text(window, wrap="word", font=("Consolas", 11), padx=18, pady=16, background="white")
         scrollbar = ttk.Scrollbar(window, command=text.yview)
         text.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
         text.pack(fill="both", expand=True)
-        text.insert("1.0", self.result.solution_text())
+        stiffness_note = ""
+        if self.stiffness_mode.get() == "E and I":
+            stiffness_note = (f"STIFFNESS INPUT\nEI = E × I × 10⁻⁶\n"
+                              f"= {self.modulus.get()} GPa × {self.inertia.get()} mm⁴ × 10⁻⁶"
+                              f" = {self.result.ei:.8g} kN·m²\n\n")
+        text.insert("1.0", stiffness_note + self.result.solution_text())
         text.configure(state="disabled")
+
+    def show_about(self) -> None:
+        messagebox.showinfo(APP_TITLE, APP_DESCRIPTION + "\n\n" + CLIENT_NAME, parent=self.root)
 
     def error(self, exc: ValueError) -> None:
         self.status.set(str(exc))
@@ -794,6 +872,17 @@ class BeamApp:
         position = lambda x: left + (right-left)*x/length
         canvas.create_text(12, 10, text="MODEL · m", anchor="nw", fill="#253348", font=("Segoe UI", 10, "bold"))
         canvas.create_line(left, y, right, y, width=5, fill="#253348")
+        if self.result:
+            extreme = max(abs(pair[0]) for pair in self.result.extrema("y"))
+            if extreme > 0:
+                points: list[float] = []
+                for a, b in zip(self.result.nodes, self.result.nodes[1:]):
+                    for step in range(25):
+                        coordinate = a + (b-a)*step/24
+                        displacement = self.result.deflection(coordinate)[0]
+                        points.extend((position(coordinate), y-25*displacement/extreme))
+                canvas.create_line(*points, fill="#168377", width=2, dash=(5, 3))
+            canvas.create_text(right, 12, text="Deformed shape · magnified", anchor="ne", fill="#168377", font=("Segoe UI", 9))
         canvas.create_text(left, 142, text="0", fill="#536078")
         canvas.create_text(right, 142, text=f"{length:g} m", fill="#536078")
         for support in self.supports:
@@ -865,7 +954,9 @@ class BeamApp:
         for value, x in (minimum, maximum):
             canvas.create_text(left-8, py(value*factor), text=f"{value*factor:.4g}", anchor="e", fill="#536078", font=("Segoe UI", 8))
         points: list[float] = []
+        pastel = {"V": "#d8e7fa", "M": "#e4dcf4", "y": "#d7eee9"}[quantity]
         for a, b in zip(result.nodes, result.nodes[1:]):
+            interval_points: list[float] = []
             for step in range(25):
                 x = a+(b-a)*step/24
                 if quantity == "y":
@@ -873,7 +964,10 @@ class BeamApp:
                 else:
                     side = "left" if step == 24 else "right"
                     value = result.shear_moment(x, side)[0 if quantity == "V" else 1]
-                points.extend((px(x), py(value*factor)))
+                interval_points.extend((px(x), py(value*factor)))
+            canvas.create_polygon(px(a), py(0), *interval_points, px(b), py(0), fill=pastel, outline="")
+            points.extend(interval_points)
+        canvas.create_line(left, py(0), right, py(0), fill="#aeb8c7")
         if len(points) >= 4:
             color = {"V": "#276bba", "M": "#7954a6", "y": "#168377"}[quantity]
             canvas.create_line(*points, fill=color, width=2)
