@@ -21,7 +21,7 @@ Build a beginner-friendly desktop beam calculator inspired by the public [Optima
 - Load type; position or interval; signed force, couple, or start/end intensity.
 - Short main actions: Example, Calculate, Clear, Show Solution.
 - Results: reactions, maximum/minimum moment and shear, shaded diagrams, and values at a requested x including slope. Deflection and a magnified deformed shape use the stiffness solution.
-- Show the full program title, client name in the lower-right footer, and program description in About.
+- Show the full program title, name as a smaller subtitle beneath it, and program description in About.
 - Model changes invalidate displayed calculations so stale results cannot be mistaken for current results.
 
 ## Verification and delivery

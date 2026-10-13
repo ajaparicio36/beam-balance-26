@@ -14,7 +14,7 @@ from tkinter import messagebox, ttk
 
 
 APP_TITLE = "Digital Multi-Load Beam Structural Analysis and Simulation System"
-CLIENT_NAME = "Emman James P. Faderon"
+NAME = "Emman James P. Faderon"
 APP_DESCRIPTION = (
     "A Python-based program that analyzes a structural beam under different loading conditions, "
     "such as point loads, uniformly distributed loads, triangular loads, and applied moments. "
@@ -501,15 +501,17 @@ class BeamApp:
         header = ttk.Frame(main)
         header.pack(fill="x", pady=(0, 12))
         ttk.Button(header, text="About", command=self.show_about).pack(side="right", padx=(12, 0))
-        title_label = ttk.Label(header, text=APP_TITLE, font=("Segoe UI", 17, "bold"), wraplength=1080)
-        title_label.pack(side="left", fill="x", expand=True)
+        heading = ttk.Frame(header)
+        heading.pack(side="left", fill="x", expand=True)
+        title_label = ttk.Label(heading, text=APP_TITLE, font=("Segoe UI", 17, "bold"), wraplength=1080)
+        title_label.pack(anchor="w", fill="x")
+        ttk.Label(heading, text=NAME, font=("Segoe UI", 11)).pack(anchor="w", pady=(3, 0))
         header.bind("<Configure>", lambda event: title_label.configure(wraplength=max(event.width-95, 300)))
         footer = ttk.Frame(main)
         footer.pack(side="bottom", fill="x", pady=(10, 0))
-        ttk.Label(footer, text=CLIENT_NAME, font=("Segoe UI", 10, "bold")).pack(side="right", padx=(14, 0), anchor="se")
         status_label = ttk.Label(footer, textvariable=self.status, wraplength=880)
         status_label.pack(side="left", fill="x", expand=True)
-        footer.bind("<Configure>", lambda event: status_label.configure(wraplength=max(event.width-220, 200)))
+        footer.bind("<Configure>", lambda event: status_label.configure(wraplength=max(event.width, 200)))
         body = ttk.Frame(main)
         body.pack(fill="both", expand=True)
         setup = ttk.Frame(body, width=360)
@@ -852,7 +854,7 @@ class BeamApp:
         text.configure(state="disabled")
 
     def show_about(self) -> None:
-        messagebox.showinfo(APP_TITLE, APP_DESCRIPTION + "\n\n" + CLIENT_NAME, parent=self.root)
+        messagebox.showinfo(APP_TITLE, APP_DESCRIPTION + "\n\n" + NAME, parent=self.root)
 
     def error(self, exc: ValueError) -> None:
         self.status.set(str(exc))
